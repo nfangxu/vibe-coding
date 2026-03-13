@@ -1,6 +1,6 @@
 ---
-description: Vue 3 前端开发规范，适用于 Vue 3 + TypeScript + Vite 项目
-globs: ["**/*.vue", "**/*.ts", "**/*.tsx", "**/vite.config.*"]
+description: Vue 3 前端开发规范，适用于 Vue 3 + TypeScript + Tailwind CSS + Vite 项目
+globs: ["**/*.vue", "**/*.ts", "**/*.tsx", "**/*.css", "**/vite.config.*", "**/tailwind.config.*"]
 alwaysApply: false
 ---
 
@@ -11,9 +11,10 @@ alwaysApply: false
 - **框架**: Vue 3 (Composition API)
 - **语言**: TypeScript（严格模式）
 - **构建工具**: Vite
+- **样式**: Tailwind CSS
 - **状态管理**: Pinia
 - **路由**: Vue Router 4
-- **UI 组件库**: Element Plus / Naive UI（按项目选择）
+- **UI 组件**: shadcn/ui（Vue 版本）或其他基于 Tailwind 的组件库
 - **HTTP 客户端**: Axios
 - **代码规范**: ESLint + Prettier
 
@@ -326,27 +327,33 @@ export default request
 
 ## 样式规范
 
-- 组件样式使用 `scoped` 避免污染全局
-- 全局样式放在 `assets/styles/` 目录
-- CSS 变量用于主题定制
-- 使用 BEM 命名约定（如使用原生 CSS）
+- **默认使用 Tailwind CSS** 工具类，避免编写自定义 CSS
+- 响应式设计采用移动优先（`sm:` `md:` `lg:` `xl:`）
+- 使用 `@apply` 将常用工具类组合为组件级样式
+- 组件样式使用 `scoped` 避免全局污染
+- 深色模式使用 `dark:` 变体
 
 ```vue
+<template>
+  <div class="flex items-center gap-4 rounded-lg bg-white p-4 shadow-sm dark:bg-gray-800">
+    <img class="h-12 w-12 rounded-full object-cover" :src="user.avatar" :alt="user.name" />
+    <div class="flex-1">
+      <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ user.name }}</h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400">{{ user.email }}</p>
+    </div>
+    <button
+      class="rounded-md bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      @click="handleAction"
+    >
+      操作
+    </button>
+  </div>
+</template>
+
 <style scoped>
+/* 仅在 Tailwind 无法满足需求时才编写自定义 CSS */
 .user-card {
-  padding: 16px;
-  border-radius: 8px;
-}
-
-.user-card__avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-}
-
-.user-card__name {
-  font-size: 16px;
-  font-weight: 600;
+  @apply flex items-center gap-4 rounded-lg bg-white p-4 shadow-sm;
 }
 </style>
 ```
