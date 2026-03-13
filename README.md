@@ -10,6 +10,7 @@ Vibe Coding 常用的一些规则示例，针对不同的编辑器 Trae / Cursor
 .
 ├── .cursor/
 │   └── rules/              # Cursor 编辑器规则（.mdc 格式）
+│       ├── general.mdc     # 通用规则（适用于所有情况）
 │       ├── golang.mdc      # Go 语言开发规范
 │       ├── vue3.mdc        # Vue 3 开发规范
 │       ├── typescript.mdc  # TypeScript 开发规范
@@ -18,6 +19,7 @@ Vibe Coding 常用的一些规则示例，针对不同的编辑器 Trae / Cursor
 │       ├── restful-api.mdc # RESTful API 设计规范
 │       └── git-commit.mdc  # Git 提交规范
 └── rules/                  # 通用规范文档（Markdown 格式）
+    ├── general.md
     ├── golang.md
     ├── vue3.md
     ├── vue-ts-tailwind.md
@@ -31,6 +33,7 @@ Vibe Coding 常用的一些规则示例，针对不同的编辑器 Trae / Cursor
 
 | 规则 | 说明 | Cursor 规则 | 通用文档 |
 |------|------|-------------|----------|
+| **通用规则** | AI 辅助编码行为规范、整洁代码原则 | [general.mdc](.cursor/rules/general.mdc) | [general.md](rules/general.md) |
 | **Go 语言** | 命名规范、错误处理、并发、测试 | [golang.mdc](.cursor/rules/golang.mdc) | [golang.md](rules/golang.md) |
 | **Vue 3** | Composition API、Pinia、路由、组件规范（含 Tailwind CSS）| [vue3.mdc](.cursor/rules/vue3.mdc) | [vue3.md](rules/vue3.md) |
 | **Vue 3 + TS + Tailwind** | Vue 3、TypeScript、Tailwind CSS 综合规范 | — | [vue-ts-tailwind.md](rules/vue-ts-tailwind.md) |
