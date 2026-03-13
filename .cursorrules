@@ -1,0 +1,43 @@
+# Vue3 + Go Full Stack Cursor Rules
+
+## Introduction
+This document outlines the rules for implementing cursor-based pagination in a Vue3 and Go full stack application.
+
+## Cursor Rules
+1. **Unique Identifiers**: Ensure every item in the database has a unique cursor identifier, typically an ID.
+2. **Order of Items**: Items must be ordered by the cursor identifier in ascending or descending order.
+3. **Fetch Logic**: When fetching the next set of items, use the last cursor from the previous set to retrieve the next batch.
+4. **Limitations**: Limit the number of items returned in each response to reduce payload size, e.g., 10 or 20 items per request.
+5. **Frontend Handling**: The front-end must handle the received cursor and prepare to load the next set of items when triggered by user interaction (e.g., scroll or button click).
+6. **Error Handling**: Implement error handling for cases where the cursor may point to deleted or inaccessible data.
+
+## Implementation Example
+### Go Backend
+- Set up an API endpoint to handle cursor-based pagination requests.
+- Query the database using the provided cursor.
+
+```go
+func FetchItems(ctx context.Context, cursor string, limit int) ([]Item, string, error) {
+    // Implementation goes here
+}
+```
+
+### Vue3 Frontend
+- Use Vue's reactivity to manage the state of current items and the cursor.
+
+```javascript
+data() {
+    return {
+        items: [],
+        cursor: null,
+    };
+},
+methods: {
+    loadMore() {
+        // Fetch next items
+    }
+}
+```
+
+## Conclusion
+Following these rules will ensure a consistent and efficient implementation of cursor-based pagination in your full stack application.
