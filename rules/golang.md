@@ -284,10 +284,10 @@ func TestGetUser_ValidID_ReturnsUser(t *testing.T) {
 type UserService struct {
     repo   UserRepository
     cache  Cache
-    logger *slog.Logger
+    logger *zap.Logger
 }
 
-func NewUserService(repo UserRepository, cache Cache, logger *slog.Logger) *UserService {
+func NewUserService(repo UserRepository, cache Cache, logger *zap.Logger) *UserService {
     return &UserService{
         repo:   repo,
         cache:  cache,
@@ -315,16 +315,32 @@ func NewServer(addr string, opts ...ServerOption) *Server {
 
 ## 日志规范
 
-- 使用 `log/slog`（Go 1.21+）进行结构化日志记录
+- 使用 `go.uber.org/zap` 进行结构化日志记录，通过依赖注入传递 `*zap.Logger`
 - 日志级别：Debug < Info < Warn < Error
 - 在函数入口记录关键参数，在错误处记录完整上下文
 - 不在底层库中记录日志，只向上返回错误
+- 生产环境使用 `zap.NewProduction()`，开发环境使用 `zap.NewDevelopment()`
+- 使用 `logger.With(...)` 为 logger 附加固定字段，避免重复传参
 
 ```go
-slog.InfoContext(ctx, "user created",
-    slog.String("user_id", user.ID),
-    slog.String("email", user.Email),
+// 初始化
+logger, _ := zap.NewProduction()
+defer logger.Sync()
+
+// 结构化日志
+logger.Info("user created",
+    zap.String("user_id", user.ID),
+    zap.String("email", user.Email),
 )
+
+// 错误日志
+logger.Error("failed to fetch user",
+    zap.String("user_id", id),
+    zap.Error(err),
+)
+
+// 附加固定字段（如 request_id）
+reqLogger := logger.With(zap.String("request_id", requestID))
 ```
 
 ## HTTP 服务
@@ -366,4 +382,5 @@ index := make(map[string]int, len(keys))
 | `wire` | 依赖注入 |
 | `testify` | 测试断言 |
 | `gomock` / `mockery` | Mock 生成 |
+| `zap` | 结构化日志 |
 | `pprof` | 性能分析 |
