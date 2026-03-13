@@ -89,24 +89,120 @@ func NewHTTPServer(lc fx.Lifecycle, cfg *Config, logger *zap.Logger) *http.Serve
 
 ### Factor III - 配置（Config）
 
-- 配置通过环境变量注入，不硬编码到代码中
-- 使用 `github.com/spf13/viper` 或 `github.com/kelseyhightower/envconfig` 读取配置
-- 配置结构体通过 fx 注入，所有组件从配置结构体读取参数
+- 使用 `github.com/spf13/viper` 统一管理配置，支持配置文件、环境变量及命令行参数，优先级从高到低：环境变量 > 配置文件 > 默认值
+- 配置文件优先从 `configs/` 目录加载，支持同时加载多个配置文件（如基础配置 + 环境特定配置），后加载的文件覆盖前者
+- 配置文件格式推荐 YAML，文件名规范：`configs/config.yaml`（基础）+ `configs/config.<env>.yaml`（环境覆盖）
+- 所有敏感配置（密码、密钥）必须通过环境变量注入，不得写入配置文件
+- 配置结构体通过 fx 注入，所有组件从配置结构体读取参数，禁止直接调用 `viper.Get*`
 
 ```go
+// configs/config.yaml（基础配置）
+http:
+  addr: ":8080"
+  read_timeout: "30s"
+  write_timeout: "30s"
+
+log:
+  level: "info"
+
+database:
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+
+// configs/config.local.yaml（本地开发覆盖，加入 .gitignore）
+http:
+  addr: ":3000"
+log:
+  level: "debug"
+```
+
+```go
+// internal/config/config.go
+package config
+
+import (
+    "fmt"
+    "strings"
+
+    "github.com/spf13/viper"
+)
+
 type Config struct {
-    HTTPAddr    string        `env:"HTTP_ADDR"    envDefault:":8080"`
-    DatabaseDSN string        `env:"DATABASE_DSN" required:"true"`
-    LogLevel    string        `env:"LOG_LEVEL"    envDefault:"info"`
-    ShutdownTO  time.Duration `env:"SHUTDOWN_TIMEOUT" envDefault:"30s"`
+    HTTP     HTTPConfig     `mapstructure:"http"`
+    Log      LogConfig      `mapstructure:"log"`
+    Database DatabaseConfig `mapstructure:"database"`
 }
 
+type HTTPConfig struct {
+    Addr         string        `mapstructure:"addr"`
+    ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+    WriteTimeout time.Duration `mapstructure:"write_timeout"`
+}
+
+type LogConfig struct {
+    Level string `mapstructure:"level"`
+}
+
+type DatabaseConfig struct {
+    DSN             string        `mapstructure:"dsn"`
+    MaxOpenConns    int           `mapstructure:"max_open_conns"`
+    MaxIdleConns    int           `mapstructure:"max_idle_conns"`
+    ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
+}
+
+// New 加载配置：优先读取 configs/ 目录下的配置文件，支持多文件叠加
+// 加载顺序：configs/config.yaml → configs/config.<APP_ENV>.yaml
+// 环境变量自动覆盖同名配置（下划线分隔，自动大写）
 func New() (*Config, error) {
+    v := viper.New()
+
+    // 基础默认值
+    v.SetDefault("http.addr", ":8080")
+    v.SetDefault("http.read_timeout", "30s")
+    v.SetDefault("http.write_timeout", "30s")
+    v.SetDefault("log.level", "info")
+
+    // 优先从 configs/ 目录加载基础配置文件
+    v.SetConfigName("config")
+    v.SetConfigType("yaml")
+    v.AddConfigPath("configs/")
+    v.AddConfigPath(".")
+
+    if err := v.ReadInConfig(); err != nil {
+        if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+            return nil, fmt.Errorf("read config file: %w", err)
+        }
+    }
+
+    // 加载环境特定配置文件（如 configs/config.production.yaml），合并覆盖
+    env := strings.ToLower(v.GetString("APP_ENV"))
+    if env == "" {
+        env = strings.ToLower(getEnv("APP_ENV", "local"))
+    }
+    v.SetConfigName("config." + env)
+    if err := v.MergeInConfig(); err != nil {
+        if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+            return nil, fmt.Errorf("merge %s config: %w", env, err)
+        }
+    }
+
+    // 环境变量自动绑定（ENV_VAR 映射 config key，如 HTTP_ADDR → http.addr）
+    v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+    v.AutomaticEnv()
+
     cfg := &Config{}
-    if err := envconfig.Process("", cfg); err != nil {
-        return nil, fmt.Errorf("parse config: %w", err)
+    if err := v.Unmarshal(cfg); err != nil {
+        return nil, fmt.Errorf("unmarshal config: %w", err)
     }
     return cfg, nil
+}
+
+func getEnv(key, defaultVal string) string {
+    if val := os.Getenv(key); val != "" {
+        return val
+    }
+    return defaultVal
 }
 ```
 
@@ -148,11 +244,11 @@ app.Run() // 阻塞直到收到终止信号，然后有序关闭
 
 ```go
 func NewLogger(cfg *Config) (*zap.Logger, error) {
-    if cfg.LogLevel == "development" {
+    if cfg.Log.Level == "development" {
         return zap.NewDevelopment()
     }
     zapCfg := zap.NewProductionConfig()
-    level, err := zap.ParseAtomicLevel(cfg.LogLevel)
+    level, err := zap.ParseAtomicLevel(cfg.Log.Level)
     if err != nil {
         return nil, fmt.Errorf("parse log level: %w", err)
     }
