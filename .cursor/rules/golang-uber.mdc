@@ -448,6 +448,98 @@ func (h *Handler) Readyz(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+## 约束五：默认技术栈选型
+
+在未明确要求的情况下，统一使用以下默认技术栈：
+
+- **HTTP 框架**：`github.com/gin-gonic/gin`
+- **ORM**：`gorm.io/gorm` + `gorm.io/driver/mysql`
+- **数据库**：MySQL
+- **API 文档**：`github.com/swaggo/swag`（swaggo）
+
+### HTTP 框架 - Gin
+
+```go
+// internal/server/server.go
+func NewHTTPServer(lc fx.Lifecycle, cfg *Config, logger *zap.Logger, h *UserHandler) *gin.Engine {
+    r := gin.New()
+    r.Use(gin.Recovery())
+
+    v1 := r.Group("/api/v1")
+    {
+        users := v1.Group("/users")
+        users.POST("", h.Create)
+        users.GET("/:id", h.Get)
+    }
+
+    srv := &http.Server{Addr: cfg.HTTP.Addr, Handler: r}
+    lc.Append(fx.Hook{
+        OnStart: func(ctx context.Context) error {
+            go srv.ListenAndServe()
+            logger.Info("http server started", zap.String("addr", cfg.HTTP.Addr))
+            return nil
+        },
+        OnStop: func(ctx context.Context) error {
+            return srv.Shutdown(ctx)
+        },
+    })
+    return r
+}
+```
+
+### ORM - GORM + MySQL
+
+```go
+// internal/database/database.go
+func NewDB(cfg *Config, logger *zap.Logger) (*gorm.DB, error) {
+    db, err := gorm.Open(mysql.Open(cfg.Database.DSN), &gorm.Config{
+        Logger: gormzap.New(logger),
+    })
+    if err != nil {
+        return nil, fmt.Errorf("open database: %w", err)
+    }
+
+    sqlDB, _ := db.DB()
+    sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+    sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+    sqlDB.SetConnMaxLifetime(cfg.Database.ConnMaxLifetime)
+
+    return db, nil
+}
+```
+
+### API 文档 - Swagger
+
+- 需要生成 API 文档时，所有 HTTP API 处理函数**必须**添加 Swagger 注释
+- 在 `cmd/<app>/main.go` 中引入 `_ "your-module/docs"` 并注册 `/swagger/*any` 路由
+- 注释字段：`@Summary`、`@Description`、`@Tags`、`@Accept`、`@Produce`、`@Param`、`@Success`、`@Failure`、`@Router`
+
+```go
+// CreateOrder godoc
+// @Summary 创建订单
+// @Description 创建一个新的商城订单
+// @Tags mall-orders
+// @Accept json
+// @Produce json
+// @Param order body dto.CreateOrderReq true "订单信息"
+// @Success 200 {object} response.Result{data=string} "订单ID"
+// @Failure 400 {object} response.Result
+// @Router /api/v1/mall/orders [post]
+func (h *OrderHandler) CreateOrder(c *gin.Context) {
+    var req dto.CreateOrderReq
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, response.Fail(err.Error()))
+        return
+    }
+    id, err := h.svc.CreateOrder(c.Request.Context(), &req)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, response.Fail(err.Error()))
+        return
+    }
+    c.JSON(http.StatusOK, response.OK(id))
+}
+```
+
 ## 推荐工具
 
 | 工具 | 用途 |
@@ -455,6 +547,10 @@ func (h *Handler) Readyz(w http.ResponseWriter, r *http.Request) {
 | `go.uber.org/fx` | 依赖注入框架 |
 | `go.uber.org/zap` | 结构化日志 |
 | `github.com/spf13/viper` | 配置管理 |
+| `github.com/gin-gonic/gin` | HTTP 框架 |
+| `gorm.io/gorm` | ORM |
+| `gorm.io/driver/mysql` | MySQL 驱动 |
+| `github.com/swaggo/swag` | Swagger 文档生成 |
 | `golangci-lint` | 静态分析 |
 | `testcontainers-go` | 集成测试容器化依赖 |
 | `gomock` / `mockery` | Mock 生成 |
