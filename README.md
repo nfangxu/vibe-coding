@@ -1,6 +1,8 @@
 # vibe-coding
 
-Vibe Coding 规则示例，用于存储和保存常用的一些规则，针对不同的编辑器 Trae / Cursor / Windsurf / JetBrains 等。
+Vibe Coding 常用的一些规则示例，针对不同的编辑器 Trae / Cursor / Windsurf / JetBrains 等。
+
+以上规则仅表示个人的常用习惯，不要犟。
 
 ## 目录结构
 
