@@ -15,13 +15,15 @@ Vibe Coding 常用的一些规则示例，针对不同的编辑器 Trae / Cursor
 │       ├── typescript.mdc  # TypeScript 开发规范
 │       ├── react.mdc       # React 开发规范
 │       ├── python.mdc      # Python 开发规范
+│       ├── restful-api.mdc # RESTful API 设计规范
 │       └── git-commit.mdc  # Git 提交规范
 └── rules/                  # 通用规范文档（Markdown 格式）
     ├── golang.md
     ├── vue3.md
     ├── typescript.md
     ├── react.md
-    └── python.md
+    ├── python.md
+    └── restful-api.md
 ```
 
 ## 规则列表
@@ -33,6 +35,7 @@ Vibe Coding 常用的一些规则示例，针对不同的编辑器 Trae / Cursor
 | **TypeScript** | 类型定义、泛型、类型守卫、模块化 | [typescript.mdc](.cursor/rules/typescript.mdc) | [typescript.md](rules/typescript.md) |
 | **React** | Hooks、状态管理、表单、性能优化 | [react.mdc](.cursor/rules/react.mdc) | [react.md](rules/react.md) |
 | **Python** | 类型注解、Pydantic、FastAPI、测试 | [python.mdc](.cursor/rules/python.mdc) | [python.md](rules/python.md) |
+| **RESTful API** | URL 设计、HTTP 方法、状态码、分页、安全 | [restful-api.mdc](.cursor/rules/restful-api.mdc) | [restful-api.md](rules/restful-api.md) |
 | **Git 提交** | Conventional Commits、分支规范、CR 清单 | [git-commit.mdc](.cursor/rules/git-commit.mdc) | — |
 
 ## 如何使用

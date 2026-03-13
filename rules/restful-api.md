@@ -1,0 +1,321 @@
+# RESTful API 设计规范
+
+> 适用于所有基于 HTTP 的 RESTful API 设计，在 AI 编辑器中使用时可将本文件内容配置为规则。
+
+## 核心原则
+
+- 以资源为中心进行 URL 设计，而非以操作为中心
+- 使用标准 HTTP 方法表达对资源的操作语义
+- 无状态：每个请求包含处理该请求所需的全部信息
+- 统一接口：保持接口设计的一致性，降低学习成本
+
+## URL 设计
+
+### 资源命名
+
+- URL 中只使用名词，不使用动词：`/users` 而非 `/getUsers`
+- 使用小写字母和连字符（kebab-case）：`/user-profiles` 而非 `/userProfiles`
+- 集合资源使用复数名词：`/articles`、`/comments`
+- 资源之间的层级关系通过路径表达，嵌套层级不超过 3 层
+
+```
+# 推荐
+GET /users
+GET /users/{id}
+GET /users/{id}/orders
+GET /users/{id}/orders/{orderId}
+
+# 避免
+GET /getUser
+GET /user_list
+GET /users/{id}/orders/{orderId}/items/{itemId}/reviews/{reviewId}
+```
+
+### 路径参数与查询参数
+
+- 资源标识使用路径参数：`/users/{id}`
+- 过滤、排序、分页使用查询参数：`/users?status=active&sort=created_at&order=desc`
+- 搜索操作使用查询参数：`/products?q=keyword`
+
+## HTTP 方法
+
+| 方法     | 用途                     | 幂等性 | 安全性 |
+| -------- | ------------------------ | ------ | ------ |
+| `GET`    | 获取资源（单个或列表）   | ✅     | ✅     |
+| `POST`   | 创建资源                 | ❌     | ❌     |
+| `PUT`    | 替换资源（完整更新）     | ✅     | ❌     |
+| `PATCH`  | 部分更新资源             | ❌     | ❌     |
+| `DELETE` | 删除资源                 | ✅     | ❌     |
+
+```
+GET    /articles          # 获取文章列表
+POST   /articles          # 创建新文章
+GET    /articles/{id}     # 获取单篇文章
+PUT    /articles/{id}     # 完整替换文章
+PATCH  /articles/{id}     # 部分更新文章
+DELETE /articles/{id}     # 删除文章
+```
+
+## API 版本控制
+
+- 在 URL 路径中包含主版本号：`/v1/users`
+- 版本号仅在发生不兼容的破坏性变更时递增
+- 旧版本保留至少 6 个月，通过响应头 `Sunset` 通知废弃日期
+
+```
+https://api.example.com/v1/users
+https://api.example.com/v2/users
+```
+
+## 请求规范
+
+### 请求头
+
+```
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer <token>
+X-Request-ID: <uuid>          # 用于链路追踪
+Accept-Language: zh-CN        # 国际化（如需要）
+```
+
+### 请求体
+
+- 使用 JSON 格式，字段名采用 `snake_case`
+- 不在 GET / DELETE 请求中附带请求体
+- 创建资源时不传入服务端生成的字段（如 `id`、`created_at`）
+
+```json
+{
+  "title": "文章标题",
+  "content": "文章内容",
+  "category_id": 1,
+  "tags": ["go", "api"]
+}
+```
+
+## 响应规范
+
+### 统一响应结构
+
+所有接口使用统一的响应包装格式：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": { }
+}
+```
+
+- `code`：业务状态码，`0` 表示成功，非 `0` 表示业务错误
+- `message`：状态描述，成功时为 `"success"`，失败时为具体错误信息
+- `data`：响应数据，失败时为 `null` 或省略
+
+### 列表响应结构
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [],
+    "total": 100,
+    "page": 1,
+    "page_size": 20
+  }
+}
+```
+
+### 响应字段命名
+
+- 字段名统一使用 `snake_case`：`created_at`、`user_id`
+- 时间字段使用 ISO 8601 格式（UTC）：`"2024-01-01T00:00:00Z"`
+- 布尔值直接使用 `true` / `false`，不使用 `0` / `1`
+- 空值字段建议返回 `null`，而非省略该字段
+
+## HTTP 状态码
+
+### 成功状态码
+
+| 状态码 | 说明                               | 使用场景           |
+| ------ | ---------------------------------- | ------------------ |
+| `200`  | OK                                 | 成功的 GET / PATCH |
+| `201`  | Created                            | 成功的 POST        |
+| `204`  | No Content                         | 成功的 DELETE      |
+
+### 客户端错误状态码
+
+| 状态码 | 说明                   | 使用场景                     |
+| ------ | ---------------------- | ---------------------------- |
+| `400`  | Bad Request            | 请求参数格式错误或缺失       |
+| `401`  | Unauthorized           | 未认证或认证已过期           |
+| `403`  | Forbidden              | 已认证但无权限               |
+| `404`  | Not Found              | 资源不存在                   |
+| `409`  | Conflict               | 资源状态冲突（如重复创建）   |
+| `422`  | Unprocessable Entity   | 请求格式正确但业务逻辑校验失败 |
+| `429`  | Too Many Requests      | 触发限流                     |
+
+### 服务端错误状态码
+
+| 状态码 | 说明                   | 使用场景         |
+| ------ | ---------------------- | ---------------- |
+| `500`  | Internal Server Error  | 服务端未预期错误 |
+| `502`  | Bad Gateway            | 上游服务异常     |
+| `503`  | Service Unavailable    | 服务暂时不可用   |
+
+## 错误响应格式
+
+发生错误时，HTTP 状态码使用对应的 4xx / 5xx，响应体使用统一结构：
+
+```json
+{
+  "code": 40001,
+  "message": "用户名或密码错误",
+  "data": null
+}
+```
+
+字段校验失败时，在 `data` 中返回详细的字段错误信息：
+
+```json
+{
+  "code": 42201,
+  "message": "参数校验失败",
+  "data": {
+    "errors": [
+      { "field": "email", "message": "邮箱格式不正确" },
+      { "field": "password", "message": "密码长度不能少于 8 位" }
+    ]
+  }
+}
+```
+
+## 分页规范
+
+### 基于页码的分页（适合管理后台）
+
+请求参数：
+
+| 参数        | 类型    | 默认值 | 说明           |
+| ----------- | ------- | ------ | -------------- |
+| `page`      | integer | `1`    | 页码，从 1 开始 |
+| `page_size` | integer | `20`   | 每页条数，最大 100 |
+
+```
+GET /articles?page=2&page_size=20
+```
+
+### 基于游标的分页（适合信息流）
+
+请求参数：
+
+| 参数          | 类型   | 说明                       |
+| ------------- | ------ | -------------------------- |
+| `cursor`      | string | 上一页返回的游标，首页留空 |
+| `limit`       | integer | 每次返回条数，最大 100    |
+
+响应数据：
+
+```json
+{
+  "items": [],
+  "next_cursor": "eyJpZCI6MTAwfQ==",
+  "has_more": true
+}
+```
+
+## 排序与过滤
+
+```
+# 排序：sort 字段名，order 排序方向
+GET /articles?sort=created_at&order=desc
+
+# 多字段排序
+GET /articles?sort=priority,created_at&order=desc,asc
+
+# 过滤：直接使用字段名作为参数
+GET /articles?status=published&category_id=1
+
+# 范围过滤
+GET /orders?created_at_gte=2024-01-01&created_at_lte=2024-12-31
+```
+
+## 认证与授权
+
+- 使用 Bearer Token（JWT）进行认证：`Authorization: Bearer <token>`
+- Token 放在请求头，不放在 URL 查询参数中
+- 敏感接口要求 HTTPS，禁止在 HTTP 下传输认证凭证
+- 响应头中设置安全相关字段：
+
+```
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+```
+
+## 幂等性设计
+
+对于可能被重复调用的写操作（如支付、发货），使用幂等键防止重复处理：
+
+```
+POST /orders
+Idempotency-Key: <client-generated-uuid>
+```
+
+服务端根据幂等键判断是否为重复请求，重复请求直接返回原始结果。
+
+## 接口文档
+
+- 使用 [OpenAPI 3.0](https://swagger.io/specification/) 规范编写接口文档
+- 每个接口必须包含：描述、请求参数说明、响应示例、错误码说明
+- 文档与代码保持同步，优先使用注解/代码生成文档
+- 提供在线可交互的文档（Swagger UI / Redoc）
+
+```yaml
+# OpenAPI 示例
+paths:
+  /users/{id}:
+    get:
+      summary: 获取用户详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: 用户不存在
+```
+
+## 安全规范
+
+- 对所有用户输入进行验证和过滤，防止注入攻击
+- 不在响应中暴露敏感信息（密码、密钥、内部路径、堆栈信息）
+- 实现请求频率限制（Rate Limiting），并通过响应头告知客户端：
+
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1704067200
+```
+
+- 对批量操作接口设置合理的数量上限，防止滥用
+
+## CORS 跨域
+
+仅对需要跨域访问的接口配置 CORS，避免使用通配符 `*`：
+
+```
+Access-Control-Allow-Origin: https://example.com
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE
+Access-Control-Allow-Headers: Content-Type, Authorization
+Access-Control-Max-Age: 86400
+```
